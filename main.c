@@ -117,6 +117,7 @@ int main(int argc, const char *argv[]) {
       buffer_write(&buffer_addresses, &(match->position), sizeof(u_int32_t));
 
       struct mismatch *mismatches = match->mismatches_start;
+      int mismatch_last_position = 0;
       while (mismatches != NULL) {
         buffer_check_flush();
         unsigned int diff;
@@ -135,7 +136,9 @@ int main(int argc, const char *argv[]) {
           diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
         }
 
-        buffer_write(&buffer_addresses, &(mismatches->position), sizeof(u_int32_t));
+        int mismatch_position_offset = mismatches->position - mismatch_last_position;
+        buffer_write(&buffer_addresses, &(mismatch_position_offset), sizeof(u_int32_t));
+        mismatch_last_position = mismatches->position;
         buffer_write(&buffer_lengths, &(mismatches->length), sizeof(u_int8_t));
 
         mismatches = mismatches->next;
