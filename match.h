@@ -20,6 +20,8 @@
 #ifndef MATCH_H
 #define MATCH_H
 
+#include "mismatch.h"
+
 #include <sys/types.h>
 
 #define BLOCKSIZE 16
@@ -29,9 +31,21 @@ struct block_hash {
   struct block_hash* next;
 };
 
+struct mismatch {
+  unsigned int position;
+  unsigned int length;
+  unsigned int diff;
+  struct mismatch* next;
+};
+
 struct match {
   unsigned int position;
   unsigned int length;
+  unsigned int code_length;
+  unsigned int mismatches;
+  unsigned int consecutive_mismatches;
+  struct mismatch* mismatches_start;
+  struct mismatch* mismatches_end;
   struct match* next;
 };
 

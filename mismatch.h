@@ -17,30 +17,22 @@
  * along with MMDelta; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef MISMATCH_H
+#define MISMATCH_H
 
-#define MAX_BUFFER_SIZE 1024*1024*8
-#define MAX_FULL_BUFFER_SIZE MAX_BUFFER_SIZE-100
-#define NUM_BUFFERS 5
+#define DIFF_TABLE_SIZE 64
+#define MAX_MISMATCHES 4
 
-struct file_buffer {
-  int fd;
-  unsigned int offset;
-  unsigned int length;
-  char data[MAX_BUFFER_SIZE];
+struct mismatch_diff {
+  char* old_data;
+  char* new_data;
+  char diff_data[MAX_MISMATCHES];
+  unsigned int last_usage;
 };
 
-#define buffer_operations buffers[0]
-#define buffer_addresses buffers[1]
-#define buffer_lengths buffers[2]
-#define buffer_data buffers[3]
-#define buffer_diff_index buffers[4]
-extern struct file_buffer buffers[NUM_BUFFERS];
+struct mismatch_diff diffs[MAX_MISMATCHES][DIFF_TABLE_SIZE];
 
-void buffer_write(struct file_buffer* buffer, void* data, int size);
-void buffer_write_int(struct file_buffer* buffer, int data, int size);
-void buffer_check_flush();
-void buffer_flush_all();
+int mismatch_find(char *old_data, char *new_data, unsigned int size, unsigned int *diff);
+struct mismatch_diff *mismatch_add(char *old_data, char *new_data, unsigned int size, unsigned int last_usage);
 
-#endif /* BUFFER_H */
+#endif /* MISMATCH_H */

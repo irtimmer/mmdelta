@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <limits.h>
+#include <float.h>
 
 u_int32_t *block_hashes;
 struct block_hash **block_hash_buckets;
@@ -63,9 +63,20 @@ void match_add_hash(unsigned int position, u_int32_t value) {
   block_hash_buckets[bucket] = &block_hash_entries[position];
 }
 
+void _match_free_mismatch_list(struct mismatch *entry) {
+  struct mismatch *prev;
+  while (entry != NULL) {
+    prev = entry;
+    entry = entry->next;
+    free(prev);
+  }
+}
+
 void match_free_list(struct match *entry) {
   struct match *prev;
   while (entry != NULL) {
+    _match_free_mismatch_list(entry->mismatches_start);
+
     prev = entry;
     entry = entry->next;
     free(prev);
@@ -87,6 +98,11 @@ struct match *match_get_list(u_int32_t value) {
 
       match->position = entry->position;
       match->length = 0;
+      match->mismatches = 0;
+      match->consecutive_mismatches = 0;
+      match->code_length = 1 + sizeof(u_int16_t);
+      match->mismatches_start = NULL;
+      match->mismatches_end = NULL;
       match->next = first;
       first = match;
     }
@@ -134,19 +150,55 @@ int match_check(struct match **prev, char *old_data, char *new_data, int size, i
 void match_grow(struct match *entry, char *old_data, char *new_data, int size) {
   while (entry != NULL) {
     int start_length = entry->length;
-    while (entry->length < (size - start_length) && old_data[entry->position * BLOCKSIZE + entry->length] == new_data[entry->length]) {
-      entry->length++;
+    while (entry->consecutive_mismatches <= MAX_MISMATCHES && entry->length < (size - start_length)) {
+      int old_position = entry->position * BLOCKSIZE + entry->length;
+      if (old_data[old_position + entry->consecutive_mismatches] == new_data[entry->length + entry->consecutive_mismatches]) {
+        if (entry->consecutive_mismatches > 0) {
+          struct mismatch *mismatch_list = malloc(sizeof(struct mismatch));
+          if (mismatch_list == NULL) {
+            fprintf(stderr, "Out of mermory\n");
+            exit(EXIT_FAILURE);
+          }
+
+          int find = mismatch_find(&old_data[old_position], &new_data[entry->length], entry->consecutive_mismatches, &mismatch_list->diff);
+          mismatch_list->length = entry->consecutive_mismatches;
+          mismatch_list->position = entry->length;
+          mismatch_list->next = NULL;
+          if (entry->mismatches_start == NULL)
+            entry->mismatches_start = mismatch_list;
+          else
+            entry->mismatches_end->next = mismatch_list;
+
+          entry->mismatches_end = mismatch_list;
+
+          if (find == -1)
+            entry->code_length += sizeof(char) + mismatch_list->length + sizeof(u_int8_t) * 2;
+          else if (find == 2)
+            entry->code_length += sizeof(char) + sizeof(u_int8_t) * 2;
+          else if (find == 1)
+            entry->code_length += sizeof(char) + sizeof(u_int8_t) * 3;
+
+          entry->mismatches += entry->consecutive_mismatches;
+          entry->length += entry->consecutive_mismatches;
+
+          entry->consecutive_mismatches = 0;
+        }
+        entry->length++;
+      } else {
+        entry->consecutive_mismatches++;
+      }
     }
     entry = entry->next;
   }
 }
 
 struct match *match_get_best(struct match *entry) {
-  unsigned int score = UINT_MAX;
+  double score = DBL_MAX;
   struct match *best = NULL;
   while (entry != NULL) {
-    if (entry->length > score) {
-      score = entry->length;
+    double entry_score = (double)entry->code_length / (double)entry->length;
+    if (entry_score < score && entry_score < 1.0 + (5.0 / (double)entry->length)) {
+      score = entry_score;
       best = entry;
     }
     entry = entry->next;

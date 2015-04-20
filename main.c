@@ -116,6 +116,31 @@ int main(int argc, const char *argv[]) {
       buffer_write(&buffer_lengths, &(match->length), sizeof(u_int32_t));
       buffer_write(&buffer_addresses, &(match->position), sizeof(u_int32_t));
 
+      struct mismatch *mismatches = match->mismatches_start;
+      while (mismatches != NULL) {
+        buffer_check_flush();
+        unsigned int diff;
+        int find = mismatch_find(old_file_data + match->position * BLOCKSIZE + mismatches->position, new_file_data + current_pointer + mismatches->position, mismatches->length, &diff);
+
+        if (find == -1) {
+          struct mismatch_diff *current_diff = mismatch_add(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
+          buffer_write(&buffer_operations, "E", 1);
+          buffer_write(&buffer_data, current_diff->diff_data, mismatches->length);
+        } else if (find == 2) {
+          buffer_write(&buffer_operations, "R", 1);
+          diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
+        } else if (find == 1) {
+          buffer_write(&buffer_operations, "F", 1);
+          buffer_write(&buffer_diff_index, &(diff), sizeof(u_int8_t));
+          diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
+        }
+
+        buffer_write(&buffer_addresses, &(mismatches->position), sizeof(u_int32_t));
+        buffer_write(&buffer_lengths, &(mismatches->length), sizeof(u_int8_t));
+
+        mismatches = mismatches->next;
+      }
+
       current_pointer += match->length;
     } else {
       current_pointer++;
