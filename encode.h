@@ -17,8 +17,9 @@
  * along with MMDelta; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "encode.h"
+#ifndef ENCODE_H
+#define ENCODE_H
 
-int main(int argc, const char* argv[]) {
-  encode(argv[1], argv[2], argv[3]);
-}
+void encode(const char* old_file, const char* new_file, const char* diff_file);
+
+#endif /* ENCODE_H */
