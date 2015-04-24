@@ -138,8 +138,7 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
           diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
         }
 
-        int mismatch_position_offset = mismatches->position - mismatch_last_position;
-        buffer_write(&buffer_offsets, &(mismatch_position_offset), sizeof(u_int32_t));
+        buffer_write_uleb128(&buffer_offsets, mismatches->position - mismatch_last_position);
         mismatch_last_position = mismatches->position;
 
         buffer_write(&buffer_diff_index, &(index), sizeof(u_int8_t));

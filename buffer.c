@@ -47,6 +47,20 @@ void buffer_write_int(struct file_buffer* buffer, int data, int size) {
   buffer_write(buffer, &data, size);
 }
 
+void buffer_write_uleb128 (struct file_buffer* buffer, int data) {
+    do {
+        buffer->data[buffer->offset] = data & 0x7fU;
+        if (data >>= 7)
+            buffer->data[buffer->offset] |= 0x80U;
+
+        buffer->offset++;
+    } while (data);
+
+    if (buffer->offset > MAX_FULL_BUFFER_SIZE) {
+      flush_event = true;
+    }
+}
+
 void buffer_flush_all() {
   for (int i=0;i<NUM_BUFFERS;i++) {
     write(buffers[i].fd, &(buffers[i].offset), sizeof(int));

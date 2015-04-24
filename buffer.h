@@ -41,6 +41,7 @@ extern struct file_buffer buffers[NUM_BUFFERS];
 
 void buffer_write(struct file_buffer* buffer, void* data, int size);
 void buffer_write_int(struct file_buffer* buffer, int data, int size);
+void buffer_write_uleb128(struct file_buffer* buffer, int data);
 void buffer_check_flush();
 void buffer_flush_all();
 
