@@ -22,7 +22,7 @@
 
 #define MAX_BUFFER_SIZE 1024*1024*8
 #define MAX_FULL_BUFFER_SIZE MAX_BUFFER_SIZE-100
-#define NUM_BUFFERS 5
+#define NUM_BUFFERS 6
 
 struct file_buffer {
   int fd;
@@ -36,6 +36,7 @@ struct file_buffer {
 #define buffer_lengths buffers[2]
 #define buffer_data buffers[3]
 #define buffer_diff_index buffers[4]
+#define buffer_offsets buffers[5]
 extern struct file_buffer buffers[NUM_BUFFERS];
 
 void buffer_write(struct file_buffer* buffer, void* data, int size);
