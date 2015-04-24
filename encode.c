@@ -122,24 +122,27 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
         buffer_check_flush();
         unsigned int diff;
         int find = mismatch_find(old_file_data + match->position * BLOCKSIZE + mismatches->position, new_file_data + current_pointer + mismatches->position, mismatches->length, &diff);
+        u_int8_t index = (mismatches->length - 1);
 
-        if (find == -1) {
-          struct mismatch_diff *current_diff = mismatch_add(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
+        struct mismatch_diff *current_diff;
+        switch (find) {
+        case -1:
+          current_diff = mismatch_add(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
           buffer_write(&buffer_operations, "E", 1);
           buffer_write(&buffer_data, current_diff->diff_data, mismatches->length);
-        } else if (find == 2) {
-          buffer_write(&buffer_operations, "R", 1);
-          diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
-        } else if (find == 1) {
+          break;
+        case 1:
+          index += (diff + 1) << 2;
+        case 2:
           buffer_write(&buffer_operations, "F", 1);
-          buffer_write(&buffer_diff_index, &(diff), sizeof(u_int8_t));
           diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
         }
 
         int mismatch_position_offset = mismatches->position - mismatch_last_position;
         buffer_write(&buffer_addresses, &(mismatch_position_offset), sizeof(u_int32_t));
         mismatch_last_position = mismatches->position;
-        buffer_write(&buffer_lengths, &(mismatches->length), sizeof(u_int8_t));
+
+        buffer_write(&buffer_diff_index, &(index), sizeof(u_int8_t));
 
         mismatches = mismatches->next;
       }

@@ -20,7 +20,7 @@
 #ifndef MISMATCH_H
 #define MISMATCH_H
 
-#define DIFF_TABLE_SIZE 64
+#define DIFF_TABLE_SIZE 63
 #define MAX_MISMATCHES 4
 
 struct mismatch_diff {
