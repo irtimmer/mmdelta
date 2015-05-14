@@ -19,7 +19,7 @@
 
 #include "buffer.h"
 #include "match.h"
-#include "fnv.h"
+#include "adler32.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -94,15 +94,20 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
 
   match_init_blocks(old_file_size);
   for (int i = 0; i < num_blocks; i++) {
-    block_hashes[i] = fnv_a(old_file_data + i * BLOCKSIZE, BLOCKSIZE);
+    block_hashes[i] = adler32(old_file_data + i * BLOCKSIZE, BLOCKSIZE);
     match_add_hash(i, block_hashes[i]);
   }
 
   unsigned int current_pointer = 0;
   unsigned int current_add = 0;
+  u_int32_t hash;
 
   while (current_pointer < new_file_size) {
-    u_int32_t hash = fnv_a(new_file_data + current_pointer, current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer);
+    if (current_add>0 && current_pointer + BLOCKSIZE < new_file_size)
+      hash = adler32_add(new_file_data[current_pointer+BLOCKSIZE-1], new_file_data[current_pointer-1], hash, BLOCKSIZE);
+    else
+      hash = adler32(new_file_data + current_pointer, current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer);
+
     struct match *matches = match_get_list(hash);
     match_check(&matches, old_file_data, &new_file_data[current_pointer], new_file_size - current_pointer, (current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer));
     match_grow(matches, old_file_data, &new_file_data[current_pointer], new_file_size - current_pointer);
