@@ -20,6 +20,7 @@
 #include "buffer.h"
 #include "match.h"
 #include "adler32.h"
+#include "progress.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -102,7 +103,12 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
   unsigned int current_add = 0;
   u_int32_t hash;
 
+  struct progress_bar progress;
+  progress_init(&progress, new_file_size);
+
   while (current_pointer < new_file_size) {
+    progress_update(&progress, current_pointer);
+
     if (current_add>0 && current_pointer + BLOCKSIZE < new_file_size)
       hash = adler32_add(new_file_data[current_pointer+BLOCKSIZE-1], new_file_data[current_pointer-1], hash, BLOCKSIZE);
     else
