@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <float.h>
 
+#define MAX_MATCHES 100
+
 u_int32_t *block_hashes;
 struct block_hash **block_hash_buckets;
 struct block_hash *block_hash_entries;
@@ -132,7 +134,7 @@ int match_check(struct match **prev, char *old_data, char *new_data, int size, i
       entry->length++;
     }
 
-    if (entry->length < checksize) {
+    if (entry->length < checksize || total_matches > MAX_MATCHES) {
       *prev = entry->next;
       free(entry);
     } else {
