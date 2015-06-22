@@ -22,29 +22,31 @@
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
+#include <stdbool.h>
 
 struct mismatch_diff diffs[MAX_MISMATCHES][DIFF_TABLE_SIZE];
 
 int mismatch_find(char *old_data, char *new_data, unsigned int size, unsigned int *diff) {
-  for (int i = 0; i < DIFF_TABLE_SIZE; i++) {
-    if (diffs[size - 1][i].old_data != NULL && memcmp(old_data, diffs[size - 1][i].old_data, size) == 0) {
-      if (memcmp(new_data, diffs[size - 1][i].new_data, size) == 0) {
-        *diff = i;
-        return 2;
-      } else {
-        break;
-      }
-    }
-  }
-
   char diff_data[size];
   for (int i = 0; i < size; i++)
     diff_data[i] = (char)(old_data[i] ^ new_data[i]);
 
+  struct mismatch_diff* sdiff = diffs[size - 1];
+  bool collision = false;
   for (int i = 0; i < DIFF_TABLE_SIZE; i++) {
-    if (diffs[size - 1][i].old_data != NULL && memcmp(diff_data, diffs[size - 1][i].diff_data, size) == 0) {
-      *diff = i;
-      return 1;
+    struct mismatch_diff* cdiff = &sdiff[i];
+    if (cdiff->old_data != NULL) {
+      if (memcmp(diff_data, cdiff->diff_data, size) == 0) {
+        if (!collision && memcmp(new_data, cdiff->new_data, size) == 0) {
+          *diff = i;
+          return 2;
+        } else {
+          *diff = i;
+          return 1;
+        }
+      } else if (memcmp(old_data, cdiff->old_data, size) == 0) {
+        collision = true;
+      }
     }
   }
 
