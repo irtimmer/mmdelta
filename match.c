@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <float.h>
+#include <string.h>
 
 #define MAX_MATCHES 100
 
@@ -85,68 +86,39 @@ void match_free_list(struct match *entry) {
   }
 }
 
-struct match *match_get_list(u_int32_t value) {
+struct match *match_get_list(u_int32_t value, int checksize, char *old_data, char *new_data) {
   unsigned int bucket = value % num_buckets;
   struct match *first = NULL;
 
   struct block_hash *entry = block_hash_buckets[bucket];
-  while (entry != NULL) {
+  int total_matches = 0;
+  while (entry != NULL && total_matches < MAX_MATCHES) {
     if (value == block_hashes[entry->position]) {
-      struct match *match = malloc(sizeof(struct match));
-      if (match == NULL) {
-        fprintf(stderr, "Out of mermory\n");
-        exit(-1);
-      }
+      if ((entry->position + checksize / BLOCKSIZE) < num_blocks && memcmp(old_data + entry->position * BLOCKSIZE, new_data, checksize) == 0) {
+        struct match *match = malloc(sizeof(struct match));
+        if (match == NULL) {
+          fprintf(stderr, "Out of mermory\n");
+          exit(-1);
+        }
 
-      match->position = entry->position;
-      match->length = 0;
-      match->mismatches = 0;
-      match->consecutive_mismatches = 0;
-      match->code_length = 1 + sizeof(u_int16_t);
-      match->mismatches_start = NULL;
-      match->mismatches_end = NULL;
-      match->next = first;
-      first = match;
+        match->position = entry->position;
+        match->length = checksize;
+        match->mismatches = 0;
+        match->consecutive_mismatches = 0;
+        match->code_length = 1 + sizeof(u_int16_t);
+        match->mismatches_start = NULL;
+        match->mismatches_end = NULL;
+        match->next = first;
+        first = match;
+
+        total_matches++;
+      }
     }
 
     entry = entry->next;
   }
 
   return first;
-}
-
-int match_check(struct match **prev, char *old_data, char *new_data, int size, int checksize) {
-  if (checksize > size)
-    checksize = size;
-
-  if (*prev == NULL)
-    return -1;
-
-  struct match *entry = *prev;
-  struct match **first = prev;
-  unsigned int total_matches = 0;
-  unsigned int data_position = 0;
-  while (entry != NULL) {
-    while (entry->length < checksize && (entry->position + entry->length / BLOCKSIZE) < num_blocks) {
-      if (old_data[entry->position * BLOCKSIZE + entry->length] != new_data[entry->length])
-        break;
-
-      entry->length++;
-    }
-
-    if (entry->length < checksize || total_matches > MAX_MATCHES) {
-      *prev = entry->next;
-      free(entry);
-    } else {
-      total_matches++;
-      prev = &(entry->next);
-      data_position += entry->position;
-    }
-
-    entry = *prev;
-  }
-
-  return total_matches;
 }
 
 void match_grow(struct match *entry, char *old_data, char *new_data, int size) {

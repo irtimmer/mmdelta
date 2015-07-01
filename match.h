@@ -56,9 +56,8 @@ void match_init_blocks(unsigned int size);
 
 void match_add_hash(unsigned int position, u_int32_t hash);
 
-struct match* match_get_list(u_int32_t hash);
+struct match* match_get_list(u_int32_t hash, int checksize, char *old_data, char *new_data);
 void match_free_list(struct match* entry);
-int match_check(struct match** prev, char* old_data, char* new_data, int size, int checksize);
 
 void match_grow(struct match* entry, char* old_data, char* new_data, int size);
 struct match* match_get_best(struct match* entry);
