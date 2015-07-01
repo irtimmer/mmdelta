@@ -19,6 +19,48 @@
 
 #include "encode.h"
 
-int main(int argc, const char* argv[]) {
-  encode(argv[1], argv[2], argv[3]);
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define ACTION_ENCODE 1
+
+int main(int argc, char* const argv[]) {
+  char c;
+  char* sourceFile = NULL;
+  char* diffFile = NULL;
+  char* targetFile = NULL;
+  int action = 0;
+  
+  while ((c = getopt(argc, argv, "-e")) != -1) {
+    switch (c) {
+    case 'e':
+      action = ACTION_ENCODE;
+      break;
+    default:
+      if (sourceFile == NULL)
+        sourceFile = optarg;
+      else if (diffFile == NULL)
+        diffFile = optarg;
+      else if (targetFile == NULL)
+        targetFile = optarg;
+      else {
+        fprintf(stderr, "Invalid option '%s'\n", optarg);
+        exit(-1);
+      }
+    }
+  }
+  
+  switch (action) {
+  case ACTION_ENCODE:
+    if (targetFile == NULL) {
+      fprintf(stderr, "Specify a source, target and diff file\n");
+      exit(EXIT_FAILURE);
+    }
+    encode(sourceFile, diffFile, targetFile);
+    break;
+  default:
+    fprintf(stderr, "Specify an action\n");
+    exit(EXIT_FAILURE);
+  }
 }
