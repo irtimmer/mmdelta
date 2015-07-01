@@ -21,6 +21,7 @@
 #include "match.h"
 #include "adler32.h"
 #include "progress.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -30,34 +31,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-
-int _mapfile(const char *filename, void **filedata) {
-  struct stat sb;
-  int fd = open(filename, O_RDONLY);
-  if (fstat(fd, &sb) == -1) {
-    fprintf(stderr, "Can't find file %s\n", filename);
-    return -1;
-  }
-  if (!S_ISREG(sb.st_mode)) {
-    fprintf(stderr, "%s is not a regular file\n", filename);
-    return -1;
-  }
-
-  *filedata = mmap(0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  if (*filedata == MAP_FAILED) {
-    fprintf(stderr, "Can't map %s to memory\n", filename);
-    return -1;
-  }
-
-  if (close(fd) == -1) {
-    fprintf(stderr, "Can't close file %s\n", filename);
-    return -1;
-  }
-
-  return sb.st_size;
-}
 
 void _flush_add_bytes(unsigned int* current_add, char *data) {
   while (*current_add > 0) {
@@ -79,11 +53,11 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
   char *old_file_data;
   char *new_file_data;
 
-  int old_file_size = _mapfile(old_file, (void*) &old_file_data);
+  int old_file_size = mapfile(old_file, (void*) &old_file_data);
   if (old_file_size < 0)
     exit(EXIT_FAILURE);
 
-  int new_file_size = _mapfile(new_file, (void*) &new_file_data);
+  int new_file_size = mapfile(new_file, (void*) &new_file_data);
   if (new_file_size < 0)
     exit(EXIT_FAILURE);
 
