@@ -92,3 +92,15 @@ bool buffer_read_all() {
   }
   return true;
 }
+
+uint64_t buffer_read_uleb128(struct file_buffer* buffer) {
+  uint64_t x = 0;
+  int bytes = 0;
+  do {
+    if (bytes == 0) x = 0;
+    x |= (buffer->data[buffer->offset] & 0x7fULL) << (7 * bytes++);
+    if (!(buffer->data[buffer->offset] & 0x80U)) break;
+  } while (buffer->offset++ < buffer->length);
+  buffer->offset++;
+  return x;
+}

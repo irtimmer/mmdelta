@@ -33,6 +33,7 @@ struct mismatch_diff {
 struct mismatch_diff diffs[MAX_MISMATCHES][DIFF_TABLE_SIZE];
 
 int mismatch_find(char *old_data, char *new_data, unsigned int size, unsigned int *diff);
-struct mismatch_diff *mismatch_add(char *old_data, char *new_data, unsigned int size, unsigned int last_usage);
+struct mismatch_diff *mismatch_add_enc(char *old_data, char *new_data, unsigned int size, unsigned int last_usage);
+struct mismatch_diff *mismatch_add_dec(char *old_data, char *diff_data, unsigned int size, unsigned int last_usage);
 
 #endif /* MISMATCH_H */

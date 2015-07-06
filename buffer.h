@@ -21,6 +21,7 @@
 #define BUFFER_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define MAX_BUFFER_SIZE 1024*1024*8
 #define MAX_FULL_BUFFER_SIZE MAX_BUFFER_SIZE-100
@@ -48,5 +49,6 @@ void buffer_check_flush();
 void buffer_flush_all();
 
 bool buffer_read_all();
+uint64_t buffer_read_uleb128(struct file_buffer* buffer);
 
 #endif /* BUFFER_H */

@@ -20,6 +20,7 @@
 #include "buffer.h"
 #include "utils.h"
 #include "match.h"
+#include "mismatch.h"
 
 #include <sys/mman.h>
 #include <stdio.h>
@@ -43,27 +44,61 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
 
   int outfd = open(target_file, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 
+  u_int32_t buffer_length = 0, buffer_offset, written = 0;
+  u_int32_t last_length = 0;
   while (buffer_read_all()) {
     for (int i=0;i<buffer_operations.length;i++) {
       u_int32_t length;
+      u_int8_t index;
+      switch (buffer_operations.data[i]) {
+      case 'A':
+      case 'C':
+          if (buffer_length > 0) {
+              write(outfd, &old_file_data[buffer_offset], buffer_length);
+              written += buffer_length;
+              buffer_length = 0;
+          }
+      }
+
       switch (buffer_operations.data[i]) {
       case 'A':
         memcpy(&length, &(buffer_lengths.data[buffer_lengths.offset]), sizeof(u_int32_t));
         buffer_lengths.offset += sizeof(u_int32_t);
         write(outfd, &(buffer_data.data[buffer_data.offset]), length);
+        written += length;
         buffer_data.offset += length;
         break;
       case 'C':
-        memcpy(&length, &(buffer_lengths.data[buffer_lengths.offset]), sizeof(u_int32_t));
+        memcpy(&buffer_length, &(buffer_lengths.data[buffer_lengths.offset]), sizeof(u_int32_t));
         buffer_lengths.offset += sizeof(u_int32_t);
 
-        u_int32_t offset;
-        memcpy(&offset, &(buffer_addresses.data[buffer_addresses.offset]), sizeof(u_int32_t));
+        memcpy(&buffer_offset, &(buffer_addresses.data[buffer_addresses.offset]), sizeof(u_int32_t));
         buffer_addresses.offset += sizeof(u_int32_t);
 
-        write(outfd, &old_file_data[offset*BLOCKSIZE], length);
+        buffer_offset *= BLOCKSIZE;
+        last_length = 0;
         break;
       case 'E':
+        memcpy(&index, &(buffer_diff_index.data[buffer_diff_index.offset]), sizeof(u_int8_t));
+        buffer_diff_index.offset += sizeof(u_int8_t);
+        length = index+1;
+
+        int position = buffer_read_uleb128(&buffer_offsets) - last_length;
+
+        write(outfd, &old_file_data[buffer_offset], position);
+        buffer_length -= position;
+        buffer_offset += position;
+        written += position;
+
+        struct mismatch_diff *diff = mismatch_add_dec(&old_file_data[buffer_offset], buffer_data.data + buffer_data.offset, length, written);
+        buffer_data.offset += length;
+
+        write(outfd, diff->new_data, length);
+        buffer_length -= length;
+        buffer_offset += length;
+        written += length;
+        last_length = length;
+        break;
       case 'F':
         fprintf(stderr, "Mismatches unsupported\n");
         exit(EXIT_FAILURE);
@@ -72,5 +107,8 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
         exit(EXIT_FAILURE);
       }
     }
+  }
+  if (buffer_length > 0) {
+      write(outfd, &old_file_data[buffer_offset], buffer_length);
   }
 }

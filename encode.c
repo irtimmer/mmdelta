@@ -111,7 +111,7 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
         struct mismatch_diff *current_diff;
         switch (find) {
         case -1:
-          current_diff = mismatch_add(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
+          current_diff = mismatch_add_enc(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
           buffer_write(&buffer_operations, "E", 1);
           buffer_write(&buffer_data, current_diff->diff_data, mismatches->length);
           break;
