@@ -23,7 +23,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 struct file_buffer buffers[NUM_BUFFERS];
 
@@ -77,4 +76,19 @@ void buffer_check_flush() {
         buffer_flush_all();
         flush_event = false;
     }
+}
+
+bool buffer_read_all() {
+  for (int i=0;i<NUM_BUFFERS;i++) {
+    int len = read(buffers[i].fd, &(buffers[i].length), sizeof(int));
+    if (len != sizeof(int))
+      return false;
+  }
+  for (int i=0;i<NUM_BUFFERS;i++) {
+    int len = read(buffers[i].fd, buffers[i].data, buffers[i].length);
+    buffers[i].offset = 0;
+    if (len != buffers[i].length)
+      return false;
+  }
+  return true;
 }

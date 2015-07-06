@@ -18,12 +18,14 @@
  */
 
 #include "encode.h"
+#include "decode.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #define ACTION_ENCODE 1
+#define ACTION_DECODE 2
 
 int main(int argc, char* const argv[]) {
   char c;
@@ -32,10 +34,13 @@ int main(int argc, char* const argv[]) {
   char* targetFile = NULL;
   int action = 0;
   
-  while ((c = getopt(argc, argv, "-e")) != -1) {
+  while ((c = getopt(argc, argv, "-ed")) != -1) {
     switch (c) {
     case 'e':
       action = ACTION_ENCODE;
+      break;
+    case 'd':
+      action = ACTION_DECODE;
       break;
     default:
       if (sourceFile == NULL)
@@ -58,6 +63,13 @@ int main(int argc, char* const argv[]) {
       exit(EXIT_FAILURE);
     }
     encode(sourceFile, diffFile, targetFile);
+    break;
+  case ACTION_DECODE:
+    if (targetFile == NULL) {
+      fprintf(stderr, "Specify a source, diff and target file\n");
+      exit(EXIT_FAILURE);
+    }
+    decode(sourceFile, diffFile, targetFile);
     break;
   default:
     fprintf(stderr, "Specify an action\n");
