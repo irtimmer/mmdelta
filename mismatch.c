@@ -54,61 +54,62 @@ int mismatch_find(char *old_data, char *new_data, unsigned int size, unsigned in
   return -1;
 }
 
-struct mismatch_diff *mismatch_add_enc(char *old_data, char *new_data, unsigned int size, unsigned int last_usage) {
+struct mismatch_diff *mismatch_find_data(char *old_data, unsigned int size) {
+  for (int i = 0; i < DIFF_TABLE_SIZE; i++) {
+    struct mismatch_diff* cdiff = &(diffs[size - 1][i]);
+    if (cdiff->old_data != NULL && memcmp(old_data, cdiff->old_data, size) == 0) {
+      return cdiff;
+    }
+  }
+
+  return NULL;
+}
+
+static struct mismatch_diff *mismatch_get_oldest(unsigned int size) {
   unsigned int oldest = 0;
   unsigned int oldest_usage = UINT_MAX;
   for (int i = 0; i < DIFF_TABLE_SIZE; i++) {
-    if (diffs[size - 1][i].last_usage < oldest_usage) {
+    if (diffs[size - 1][i].new_data == NULL || diffs[size - 1][i].last_usage < oldest_usage) {
       oldest_usage = diffs[size - 1][i].last_usage;
       oldest = i;
     }
   }
-
-  for (int i = 0; i < size; i++)
-    diffs[size - 1][oldest].diff_data[i] = (char)(old_data[i] ^ new_data[i]);
-
-  diffs[size - 1][oldest].last_usage = last_usage;
-  diffs[size - 1][oldest].old_data = old_data;
-  diffs[size - 1][oldest].new_data = new_data;
-
   return &(diffs[size - 1][oldest]);
 }
 
+struct mismatch_diff *mismatch_add_enc(char *old_data, char *new_data, unsigned int size, unsigned int last_usage) {
+  struct mismatch_diff *oldest = mismatch_get_oldest(size);
+
+  for (int i = 0; i < size; i++)
+    oldest->diff_data[i] = (char)(old_data[i] ^ new_data[i]);
+
+  oldest->last_usage = last_usage;
+  oldest->old_data = old_data;
+  oldest->new_data = new_data;
+
+  return oldest;
+}
+
 struct mismatch_diff *mismatch_add_dec(char *old_data, char *diff_data, unsigned int size, unsigned int last_usage) {
-  unsigned int oldest = 0;
-  unsigned int oldest_usage = UINT_MAX;
-  for (int i = 0; i < DIFF_TABLE_SIZE; i++) {
-    if (diffs[size - 1][i].last_usage < oldest_usage) {
-      oldest_usage = diffs[size - 1][i].last_usage;
-      oldest = i;
-    }
-  }
+  struct mismatch_diff *oldest = mismatch_get_oldest(size);
 
-  if (diffs[size - 1][oldest].old_data == NULL) {
-      char *olddata_cache = malloc(size);
-      if (olddata_cache == NULL) {
-          fprintf(stderr, "Out of mermory, allocating %d bytes\n", size);
-          exit(-1);
-      }
-
+  if (oldest->new_data == NULL) {
       char *newdata_cache = malloc(size);
       if (newdata_cache == NULL) {
           fprintf(stderr, "Out of mermory, allocating %d bytes\n", size);
           exit(-1);
       }
 
-      diffs[size - 1][oldest].old_data = olddata_cache;
-      diffs[size - 1][oldest].new_data = newdata_cache;
+      oldest->new_data = newdata_cache;
   }
 
-  memcpy(diffs[size - 1][oldest].old_data, old_data, size);
-
-  diffs[size - 1][oldest].last_usage = last_usage;
+  oldest->old_data = old_data;
+  oldest->last_usage = last_usage;
 
   for (int i = 0; i < size; i++) {
-    diffs[size - 1][oldest].diff_data[i] = diff_data[i];
-    diffs[size - 1][oldest].new_data[i] = (char)(old_data[i] ^ diff_data[i]);
+    oldest->diff_data[i] = diff_data[i];
+    oldest->new_data[i] = (char)(old_data[i] ^ diff_data[i]);
   }
 
-  return &(diffs[size - 1][oldest]);
+  return oldest;
 }
