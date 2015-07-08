@@ -100,8 +100,40 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
         last_length = length;
         break;
       case 'F':
-        fprintf(stderr, "Mismatches unsupported\n");
-        exit(EXIT_FAILURE);
+        memcpy(&index, &(buffer_diff_index.data[buffer_diff_index.offset]), sizeof(u_int8_t));
+        buffer_diff_index.offset += sizeof(u_int8_t);
+        length = (index & 0x3) + 1;
+        index >>= 2;
+
+        position = buffer_read_uleb128(&buffer_offsets) - last_length;
+
+        write(outfd, &old_file_data[buffer_offset], position);
+        written += position;
+        buffer_length -= position;
+        buffer_offset += position;
+
+        if (index > 0) {
+          diffs[length-1][index-1].last_usage = written;
+          char mismatch_buffer[MAX_MISMATCHES];
+          for (int i=0;i<length;i++) {
+            mismatch_buffer[i] = old_file_data[buffer_offset+i] ^ diffs[length-1][index-1].diff_data[i];
+          }
+          write(outfd, mismatch_buffer, length);
+        } else {
+          struct mismatch_diff* diff = mismatch_find_data(&old_file_data[buffer_offset], length);
+          if (diff == NULL) {
+            printf("Mismatch diff can't be found\n");
+            exit(EXIT_FAILURE);
+          }
+          diff->last_usage = written;
+          write(outfd, diff->new_data, length);
+        }
+
+        buffer_length -= length;
+        buffer_offset += length;
+        last_length = length;
+        written += length;
+        break;
       default:
         fprintf(stderr, "Unsupported action '%c'\n", buffer_operations.data[i]);
         exit(EXIT_FAILURE);
