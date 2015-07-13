@@ -33,6 +33,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+static lzma_filter filters[2];
+static lzma_options_lzma options;
+
 void _flush_add_bytes(unsigned int* current_add, char *data) {
   while (*current_add > 0) {
     buffer_check_flush();
@@ -50,6 +53,16 @@ void _flush_add_bytes(unsigned int* current_add, char *data) {
 }
 
 void encode(const char* old_file, const char* new_file, const char* diff_file) {
+  memset(&filters, 0, sizeof(filters));
+  if (lzma_lzma_preset(&options, 9)) {
+    fprintf(stderr, "Invalid options\n");
+    exit(-1);
+  }
+  filters[0].id = LZMA_FILTER_LZMA2;
+  filters[0].options = &options;
+  filters[1].id = LZMA_VLI_UNKNOWN;
+  lzma_stream_encoder(&stream, &filters[0], LZMA_CHECK_NONE);
+
   char *old_file_data;
   char *new_file_data;
 

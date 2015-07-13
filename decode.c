@@ -31,6 +31,12 @@
 #include <unistd.h>
 
 void decode(const char* old_file, const char* diff_file, const char* target_file) {
+  lzma_stream_decoder(&stream, UINT64_MAX, LZMA_TELL_NO_CHECK);
+  stream.next_in = NULL;
+  stream.avail_in = 0;
+  stream.next_out = NULL;
+  stream.avail_out = 0;
+
   char *old_file_data;
 
   int old_file_size = mapfile(old_file, (void*) &old_file_data);

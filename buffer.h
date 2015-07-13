@@ -20,6 +20,8 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
+#include <lzma.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -41,6 +43,7 @@ struct file_buffer {
 #define buffer_diff_index buffers[4]
 #define buffer_offsets buffers[5]
 extern struct file_buffer buffers[NUM_BUFFERS];
+extern lzma_stream stream;
 
 void buffer_write(struct file_buffer* buffer, void* data, int size);
 void buffer_write_int(struct file_buffer* buffer, int data, int size);

@@ -23,10 +23,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 struct file_buffer buffers[NUM_BUFFERS];
+lzma_stream stream;
 
 static bool flush_event;
+static char in_buffer[4096];
 
 void buffer_write(struct file_buffer* buffer, void* data, int size) {
   if (size+buffer->offset >MAX_BUFFER_SIZE) {
@@ -61,12 +64,46 @@ void buffer_write_uleb128 (struct file_buffer* buffer, int data) {
 }
 
 void buffer_flush_all() {
-  for (int i=0;i<NUM_BUFFERS;i++) {
-    write(buffers[i].fd, &(buffers[i].offset), sizeof(int));
-  }
+  char outbuf[4096];
 
   for (int i=0;i<NUM_BUFFERS;i++) {
-    write(buffers[i].fd, buffers[i].data, buffers[i].offset);
+    stream.next_in = &(buffers[i].offset);
+    stream.avail_in = sizeof(int);
+    stream.next_out = outbuf;
+    stream.avail_out = sizeof(outbuf);
+    while (stream.avail_in > 0) {
+      int ret = lzma_code(&stream, LZMA_RUN);
+      if (stream.avail_out == 0) {
+        write(buffers[i].fd, outbuf, sizeof(outbuf));
+        stream.next_out = outbuf;
+        stream.avail_out = sizeof(outbuf);
+      }
+    }
+
+    stream.next_in = buffers[i].data;
+    stream.avail_in = buffers[i].offset;
+    while (stream.avail_in > 0) {
+      int ret = lzma_code(&stream, LZMA_RUN);
+      if (stream.avail_out == 0) {
+        write(buffers[i].fd, outbuf, sizeof(outbuf));
+        stream.next_out = outbuf;
+        stream.avail_out = sizeof(outbuf);
+      }
+    }
+
+    bool ready = false;
+    while (!ready) {
+      if (stream.avail_out == 0) {
+        write(buffers[i].fd, outbuf, sizeof(outbuf));
+        stream.next_out = outbuf;
+        stream.avail_out = sizeof(outbuf);
+      }
+      if (lzma_code(&stream, LZMA_SYNC_FLUSH) == LZMA_STREAM_END) {
+        write(buffers[i].fd, outbuf, sizeof(outbuf)-stream.avail_out);
+        ready = true;
+      }
+    }
+
     buffers[i].offset = 0;
   }
 }
@@ -80,16 +117,34 @@ void buffer_check_flush() {
 
 bool buffer_read_all() {
   for (int i=0;i<NUM_BUFFERS;i++) {
-    int len = read(buffers[i].fd, &(buffers[i].length), sizeof(int));
-    if (len != sizeof(int))
-      return false;
+    stream.next_out = &(buffers[i].length);
+    stream.avail_out = sizeof(int);
+    while (stream.avail_out > 0) {
+      if (stream.avail_in == 0) {
+        stream.avail_in = read(buffers[i].fd, in_buffer, sizeof(in_buffer));
+        stream.next_in = in_buffer;
+      }
+
+      if (stream.avail_in <= 0)
+        return false;
+
+      int ret = lzma_code(&stream, LZMA_RUN);
+    }
+    stream.next_out = buffers[i].data;
+    stream.avail_out = buffers[i].length;
+    while (stream.avail_out > 0) {
+      if (stream.avail_in == 0) {
+        stream.avail_in = read(buffers[i].fd, in_buffer, sizeof(in_buffer));
+        stream.next_in = in_buffer;
+      }
+
+      if (stream.avail_in <= 0)
+        return false;
+
+      int ret = lzma_code(&stream, LZMA_RUN);
+    }
   }
-  for (int i=0;i<NUM_BUFFERS;i++) {
-    int len = read(buffers[i].fd, buffers[i].data, buffers[i].length);
-    buffers[i].offset = 0;
-    if (len != buffers[i].length)
-      return false;
-  }
+
   return true;
 }
 
