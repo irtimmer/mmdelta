@@ -102,7 +102,7 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
       hash = adler32(new_file_data + current_pointer, current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer);
 
     struct match *matches = match_get_list(hash, (current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer), old_file_data, &new_file_data[current_pointer]);
-    match_grow(matches, old_file_data, &new_file_data[current_pointer], new_file_size - current_pointer);
+    match_grow(matches, old_file_data, old_file_size, &new_file_data[current_pointer], new_file_size - current_pointer);
 
     struct match *match = match_get_best(matches);
     if (match != NULL) {

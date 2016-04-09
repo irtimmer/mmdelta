@@ -121,10 +121,10 @@ struct match *match_get_list(u_int32_t value, int checksize, char *old_data, cha
   return first;
 }
 
-void match_grow(struct match *entry, char *old_data, char *new_data, int size) {
+void match_grow(struct match *entry, char *old_data, int old_size, char *new_data, int new_size) {
   while (entry != NULL) {
     int start_length = entry->length;
-    while (entry->consecutive_mismatches <= MAX_MISMATCHES && entry->length < (size - start_length)) {
+    while (entry->consecutive_mismatches <= MAX_MISMATCHES && entry->position * BLOCKSIZE + entry->length + entry->consecutive_mismatches < old_size && entry->length < (new_size - start_length)) {
       int old_position = entry->position * BLOCKSIZE + entry->length;
       if (old_data[old_position + entry->consecutive_mismatches] == new_data[entry->length + entry->consecutive_mismatches]) {
         if (entry->consecutive_mismatches > 0) {

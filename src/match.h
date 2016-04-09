@@ -59,7 +59,7 @@ void match_add_hash(unsigned int position, u_int32_t hash);
 struct match* match_get_list(u_int32_t hash, int checksize, char *old_data, char *new_data);
 void match_free_list(struct match* entry);
 
-void match_grow(struct match* entry, char* old_data, char* new_data, int size);
+void match_grow(struct match* entry, char* old_data, int old_size, char* new_data, int new_size);
 struct match* match_get_best(struct match* entry);
 
 #endif /* MATCH_H */
