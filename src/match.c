@@ -27,6 +27,9 @@
 
 #define MAX_MATCHES 100
 
+#define SCORE_START 1
+#define SCORE_MISMATCH 2
+
 u_int32_t *block_hashes;
 struct block_hash **block_hash_buckets;
 struct block_hash *block_hash_entries;
@@ -105,7 +108,7 @@ struct match *match_get_list(u_int32_t value, int checksize, char *old_data, cha
         match->length = checksize;
         match->mismatches = 0;
         match->consecutive_mismatches = 0;
-        match->code_length = 1 + sizeof(u_int16_t);
+        match->code_length = SCORE_START;
         match->mismatches_start = NULL;
         match->mismatches_end = NULL;
         match->next = first;
@@ -134,7 +137,6 @@ void match_grow(struct match *entry, char *old_data, int old_size, char *new_dat
             exit(EXIT_FAILURE);
           }
 
-          int find = mismatch_find(&old_data[old_position], &new_data[entry->length], entry->consecutive_mismatches, &mismatch_list->diff);
           mismatch_list->length = entry->consecutive_mismatches;
           mismatch_list->position = entry->length;
           mismatch_list->next = NULL;
@@ -145,13 +147,7 @@ void match_grow(struct match *entry, char *old_data, int old_size, char *new_dat
 
           entry->mismatches_end = mismatch_list;
 
-          if (find == -1)
-            entry->code_length += sizeof(char) + mismatch_list->length + sizeof(u_int8_t) * 2;
-          else if (find == 2)
-            entry->code_length += sizeof(char) + sizeof(u_int8_t) * 2;
-          else if (find == 1)
-            entry->code_length += sizeof(char) + sizeof(u_int8_t) * 3;
-
+          entry->code_length += SCORE_MISMATCH;
           entry->mismatches += entry->consecutive_mismatches;
           entry->length += entry->consecutive_mismatches;
 
@@ -171,7 +167,7 @@ struct match *match_get_best(struct match *entry) {
   struct match *best = NULL;
   while (entry != NULL) {
     double entry_score = (double)entry->code_length / (double)entry->length;
-    if (entry_score < score && entry_score < 1.0 + (5.0 / (double)entry->length)) {
+    if (entry_score < score) {
       score = entry_score;
       best = entry;
     }
