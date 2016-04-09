@@ -117,6 +117,7 @@ void buffer_check_flush() {
 
 bool buffer_read_all() {
   for (int i=0;i<NUM_BUFFERS;i++) {
+    buffers[i].offset = 0;
     stream.next_out = &(buffers[i].length);
     stream.avail_out = sizeof(int);
     while (stream.avail_out > 0) {
