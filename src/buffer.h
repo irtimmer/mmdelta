@@ -31,10 +31,12 @@ struct block_buffer {
   char data[MAX_BUFFER_SIZE];
 };
 
-void buffer_write(struct block_buffer* buffer, void* data, int size);
-void buffer_write_int(struct block_buffer* buffer, int data, int size);
 void buffer_write_uleb128(struct block_buffer* buffer, int data);
+void buffer_write_data(struct block_buffer* buffer, void* data, int size);
+#define buffer_write(buffer, data) buffer_write_data(buffer, &data, sizeof(data));
 
 uint64_t buffer_read_uleb128(struct block_buffer* buffer);
+void buffer_read_data(struct block_buffer* buffer, void* data, int size);
+#define buffer_read(buffer, data) buffer_read_data(buffer, &data, sizeof(data));
 
 #endif /* BUFFER_H */

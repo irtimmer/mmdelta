@@ -62,25 +62,21 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
 
       switch (buffer_operations(stream).data[i]) {
       case 'A':
-        memcpy(&length, &(buffer_lengths(stream).data[buffer_lengths(stream).offset]), sizeof(u_int32_t));
-        buffer_lengths(stream).offset += sizeof(u_int32_t);
+        buffer_read(&buffer_lengths(stream), length);
+
         write(fd, &(buffer_data(stream).data[buffer_data(stream).offset]), length);
-        written += length;
         buffer_data(stream).offset += length;
+        written += length;
         break;
       case 'C':
-        memcpy(&buffer_length, &(buffer_lengths(stream).data[buffer_lengths(stream).offset]), sizeof(u_int32_t));
-        buffer_lengths(stream).offset += sizeof(u_int32_t);
-
-        memcpy(&buffer_offset, &(buffer_addresses(stream).data[buffer_addresses(stream).offset]), sizeof(u_int32_t));
-        buffer_addresses(stream).offset += sizeof(u_int32_t);
+        buffer_read(&buffer_lengths(stream), buffer_length);
+        buffer_read(&buffer_addresses(stream), buffer_offset);
 
         buffer_offset *= BLOCKSIZE;
         last_length = 0;
         break;
       case 'E':
-        memcpy(&index, &(buffer_diff_index(stream).data[buffer_diff_index(stream).offset]), sizeof(u_int8_t));
-        buffer_diff_index(stream).offset += sizeof(u_int8_t);
+        buffer_read(&buffer_diff_index(stream), index);
         length = index+1;
 
         int position = buffer_read_uleb128(&buffer_offsets(stream)) - last_length;
@@ -100,8 +96,7 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
         last_length = length;
         break;
       case 'F':
-        memcpy(&index, &(buffer_diff_index(stream).data[buffer_diff_index(stream).offset]), sizeof(u_int8_t));
-        buffer_diff_index(stream).offset += sizeof(u_int8_t);
+        buffer_read(&buffer_diff_index(stream), index);
         length = (index & 0x3) + 1;
         index >>= 2;
 

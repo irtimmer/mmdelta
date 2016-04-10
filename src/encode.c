@@ -33,6 +33,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+static const char ADD_OPERATION = 'A';
+static const char COPY_OPERATION = 'C';
+static const char ENCODE_MISMATCH_OPERATION = 'E';
+static const char MISMATCH_OPERATION = 'F';
+
 void flush_add_bytes(struct delta_stream* st, unsigned int* current_add, char *data) {
   while (*current_add > 0) {
     buffer_check_flush(st);
@@ -41,9 +46,9 @@ void flush_add_bytes(struct delta_stream* st, unsigned int* current_add, char *d
       to_write = MAX_BUFFER_SIZE - buffer_data(st).offset;
     }
 
-    buffer_write(&buffer_operations(st), "A", 1);
-    buffer_write(&buffer_data(st), data, to_write);
-    buffer_write(&buffer_lengths(st), &to_write, sizeof(u_int32_t));
+    buffer_write(&buffer_operations(st), ADD_OPERATION);
+    buffer_write_data(&buffer_data(st), data, to_write);
+    buffer_write(&buffer_lengths(st), to_write);
     *current_add -= to_write;
     data += to_write;
   }
@@ -105,9 +110,9 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
       flush_add_bytes(stream, &current_add, new_file_data + current_pointer - current_add);
 
       buffer_check_flush(stream);
-      buffer_write(&buffer_operations(stream), "C", 1);
-      buffer_write(&buffer_lengths(stream), &(match->length), sizeof(u_int32_t));
-      buffer_write(&buffer_addresses(stream), &(match->position), sizeof(u_int32_t));
+      buffer_write(&buffer_operations(stream), COPY_OPERATION);
+      buffer_write(&buffer_lengths(stream), match->length);
+      buffer_write(&buffer_addresses(stream), match->position);
 
       struct mismatch *mismatches = match->mismatches_start;
       int mismatch_last_position = 0;
@@ -121,20 +126,20 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
         switch (find) {
         case -1:
           current_diff = mismatch_add_enc(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
-          buffer_write(&buffer_operations(stream), "E", 1);
-          buffer_write(&buffer_data(stream), current_diff->diff_data, mismatches->length);
+          buffer_write(&buffer_operations(stream), ENCODE_MISMATCH_OPERATION);
+          buffer_write_data(&buffer_data(stream), current_diff->diff_data, mismatches->length);
           break;
         case 1:
           index += (diff + 1) << 2;
         case 2:
-          buffer_write(&buffer_operations(stream), "F", 1);
+          buffer_write(&buffer_operations(stream), MISMATCH_OPERATION);
           diffs[mismatches->length - 1][diff].last_usage = current_pointer + mismatches->position;
         }
 
         buffer_write_uleb128(&buffer_offsets(stream), mismatches->position - mismatch_last_position);
         mismatch_last_position = mismatches->position;
 
-        buffer_write(&buffer_diff_index(stream), &(index), sizeof(u_int8_t));
+        buffer_write(&buffer_diff_index(stream), index);
 
         mismatches = mismatches->next;
       }

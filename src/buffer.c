@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-void buffer_write(struct block_buffer* buffer, void* data, int size) {
+void buffer_write_data(struct block_buffer* buffer, void* data, int size) {
   if (size+buffer->offset >MAX_BUFFER_SIZE) {
     fprintf(stderr, "Buffer not big enough (%d/%d)\n", size, MAX_BUFFER_SIZE - buffer->offset);
     exit(EXIT_FAILURE);
@@ -36,8 +36,9 @@ void buffer_write(struct block_buffer* buffer, void* data, int size) {
   buffer->length += size;
 }
 
-void buffer_write_int(struct block_buffer* buffer, int data, int size) {
-  buffer_write(buffer, &data, size);
+void buffer_read_data(struct block_buffer* buffer, void* data, int size) {
+  memcpy(data, &(buffer->data[buffer->offset]), size);
+  buffer->offset += size;
 }
 
 void buffer_write_uleb128 (struct block_buffer* buffer, int data) {
