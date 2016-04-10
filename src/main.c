@@ -33,7 +33,7 @@ int main(int argc, char* const argv[]) {
   char* diffFile = NULL;
   char* targetFile = NULL;
   int action = 0;
-  
+
   while ((c = getopt(argc, argv, "-ed")) != -1) {
     switch (c) {
     case 'e':
@@ -55,7 +55,7 @@ int main(int argc, char* const argv[]) {
       }
     }
   }
-  
+
   switch (action) {
   case ACTION_ENCODE:
     if (targetFile == NULL) {

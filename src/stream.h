@@ -17,24 +17,31 @@
  * along with MMDelta; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef STREAM_H
+#define STREAM_H
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "buffer.h"
 
-#define MAX_BUFFER_SIZE 1024*1024*8
+#include <lzma.h>
 
-struct block_buffer {
-  unsigned int offset;
-  unsigned int length;
-  char data[MAX_BUFFER_SIZE];
+#define NUM_BUFFERS 6
+
+#define buffer_operations(stream) stream->buffers[0]
+#define buffer_addresses(stream) stream->buffers[1]
+#define buffer_lengths(stream) stream->buffers[2]
+#define buffer_data(stream) stream->buffers[3]
+#define buffer_diff_index(stream) stream->buffers[4]
+#define buffer_offsets(stream) stream->buffers[5]
+
+struct delta_stream {
+  int fd;
+  lzma_stream lzma;
+  struct block_buffer buffers[NUM_BUFFERS];
 };
 
-void buffer_write(struct block_buffer* buffer, void* data, int size);
-void buffer_write_int(struct block_buffer* buffer, int data, int size);
-void buffer_write_uleb128(struct block_buffer* buffer, int data);
+void stream_check_flush(struct delta_stream* stream);
+void stream_flush(struct delta_stream* stream);
 
-uint64_t buffer_read_uleb128(struct block_buffer* buffer);
+bool stream_read(struct delta_stream* st);
 
-#endif /* BUFFER_H */
+#endif /* STREAM_H */
