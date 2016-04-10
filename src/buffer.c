@@ -25,13 +25,13 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-struct file_buffer buffers[NUM_BUFFERS];
+struct block_buffer buffers[NUM_BUFFERS];
 lzma_stream stream;
 
 static bool flush_event;
 static char in_buffer[4096];
 
-void buffer_write(struct file_buffer* buffer, void* data, int size) {
+void buffer_write(struct block_buffer* buffer, void* data, int size) {
   if (size+buffer->offset >MAX_BUFFER_SIZE) {
     fprintf(stderr, "Buffer not big enough (%d/%d)\n", size, MAX_BUFFER_SIZE - buffer->offset);
     exit(EXIT_FAILURE);
@@ -45,11 +45,11 @@ void buffer_write(struct file_buffer* buffer, void* data, int size) {
   }
 }
 
-void buffer_write_int(struct file_buffer* buffer, int data, int size) {
+void buffer_write_int(struct block_buffer* buffer, int data, int size) {
   buffer_write(buffer, &data, size);
 }
 
-void buffer_write_uleb128 (struct file_buffer* buffer, int data) {
+void buffer_write_uleb128 (struct block_buffer* buffer, int data) {
     do {
         buffer->data[buffer->offset] = data & 0x7fU;
         if (data >>= 7)
@@ -65,12 +65,13 @@ void buffer_write_uleb128 (struct file_buffer* buffer, int data) {
 
 void buffer_flush_all() {
   char outbuf[4096];
+  stream.next_out = outbuf;
+  stream.avail_out = sizeof(outbuf);
 
+  //Encode block sizes
   for (int i=0;i<NUM_BUFFERS;i++) {
     stream.next_in = &(buffers[i].offset);
     stream.avail_in = sizeof(int);
-    stream.next_out = outbuf;
-    stream.avail_out = sizeof(outbuf);
     while (stream.avail_in > 0) {
       int ret = lzma_code(&stream, LZMA_RUN);
       if (stream.avail_out == 0) {
@@ -79,7 +80,10 @@ void buffer_flush_all() {
         stream.avail_out = sizeof(outbuf);
       }
     }
+  }
 
+  //Encode block data
+  for (int i=0;i<NUM_BUFFERS;i++) {
     stream.next_in = buffers[i].data;
     stream.avail_in = buffers[i].offset;
     while (stream.avail_in > 0) {
@@ -91,21 +95,17 @@ void buffer_flush_all() {
       }
     }
 
-    bool ready = false;
-    while (!ready) {
-      if (stream.avail_out == 0) {
-        write(buffers[i].fd, outbuf, sizeof(outbuf));
-        stream.next_out = outbuf;
-        stream.avail_out = sizeof(outbuf);
-      }
-      if (lzma_code(&stream, LZMA_SYNC_FLUSH) == LZMA_STREAM_END) {
-        write(buffers[i].fd, outbuf, sizeof(outbuf)-stream.avail_out);
-        ready = true;
-      }
-    }
-
     buffers[i].offset = 0;
   }
+
+  while (lzma_code(&stream, LZMA_SYNC_FLUSH) != LZMA_STREAM_END) {
+    if (stream.avail_out == 0) {
+      write(buffers[0].fd, outbuf, sizeof(outbuf));
+      stream.next_out = outbuf;
+      stream.avail_out = sizeof(outbuf);
+    }
+  }
+  write(buffers[0].fd, outbuf, sizeof(outbuf)-stream.avail_out);
 }
 
 void buffer_check_flush() {
@@ -116,6 +116,7 @@ void buffer_check_flush() {
 }
 
 bool buffer_read_all() {
+  //Decode block sizes
   for (int i=0;i<NUM_BUFFERS;i++) {
     buffers[i].offset = 0;
     stream.next_out = &(buffers[i].length);
@@ -131,6 +132,10 @@ bool buffer_read_all() {
 
       int ret = lzma_code(&stream, LZMA_RUN);
     }
+  }
+
+  //Decode block data
+  for (int i=0;i<NUM_BUFFERS;i++) {
     stream.next_out = buffers[i].data;
     stream.avail_out = buffers[i].length;
     while (stream.avail_out > 0) {
@@ -149,7 +154,7 @@ bool buffer_read_all() {
   return true;
 }
 
-uint64_t buffer_read_uleb128(struct file_buffer* buffer) {
+uint64_t buffer_read_uleb128(struct block_buffer* buffer) {
   uint64_t x = 0;
   int bytes = 0;
   do {

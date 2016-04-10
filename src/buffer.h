@@ -29,7 +29,7 @@
 #define MAX_FULL_BUFFER_SIZE MAX_BUFFER_SIZE-100
 #define NUM_BUFFERS 6
 
-struct file_buffer {
+struct block_buffer {
   int fd;
   unsigned int offset;
   unsigned int length;
@@ -42,16 +42,16 @@ struct file_buffer {
 #define buffer_data buffers[3]
 #define buffer_diff_index buffers[4]
 #define buffer_offsets buffers[5]
-extern struct file_buffer buffers[NUM_BUFFERS];
+extern struct block_buffer buffers[NUM_BUFFERS];
 extern lzma_stream stream;
 
-void buffer_write(struct file_buffer* buffer, void* data, int size);
-void buffer_write_int(struct file_buffer* buffer, int data, int size);
-void buffer_write_uleb128(struct file_buffer* buffer, int data);
+void buffer_write(struct block_buffer* buffer, void* data, int size);
+void buffer_write_int(struct block_buffer* buffer, int data, int size);
+void buffer_write_uleb128(struct block_buffer* buffer, int data);
 void buffer_check_flush();
 void buffer_flush_all();
 
 bool buffer_read_all();
-uint64_t buffer_read_uleb128(struct file_buffer* buffer);
+uint64_t buffer_read_uleb128(struct block_buffer* buffer);
 
 #endif /* BUFFER_H */
