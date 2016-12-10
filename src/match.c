@@ -1,7 +1,7 @@
 /*
  * This file is part of MMDelta.
  *
- * Copyright (C) 2015 Iwan Timmer
+ * Copyright (C) 2015, 2016 Iwan Timmer
  *
  * MMDelta is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,43 +30,39 @@
 #define SCORE_START 1
 #define SCORE_MISMATCH 2
 
-u_int32_t *block_hashes;
-struct block_hash **block_hash_buckets;
-struct block_hash *block_hash_entries;
-
-int num_blocks;
-int num_buckets;
-
-void match_init_blocks(unsigned int size) {
-  num_blocks = num_buckets = size / BLOCKSIZE;
-  block_hash_buckets = calloc(num_buckets, sizeof(struct block_hash *));
-  if (block_hash_buckets == NULL) {
+void match_init_table(struct match_table *map, char* data, unsigned int size) {
+  map->num_blocks = map->num_buckets = size / BLOCKSIZE;
+  map->buckets = calloc(map->num_buckets, sizeof(struct block_hash *));
+  if (map->buckets == NULL) {
     fprintf(stderr, "Out of mermory\n");
     exit(EXIT_FAILURE);
   }
 
-  for (int i = 0; i < num_buckets; i++) {
-    block_hash_buckets[i] = NULL;
+  for (int i = 0; i < map->num_buckets; i++) {
+    map->buckets[i] = NULL;
   }
 
-  block_hashes = calloc(num_blocks, sizeof(u_int32_t));
-  if (block_hashes == NULL) {
+  map->hashes = calloc(map->num_blocks, sizeof(u_int32_t));
+  if (map->hashes == NULL) {
     fprintf(stderr, "Out of mermory\n");
     exit(EXIT_FAILURE);
   }
 
-  block_hash_entries = calloc(num_blocks, sizeof(struct block_hash));
-  if (block_hash_entries == NULL) {
+  map->entries = calloc(map->num_blocks, sizeof(struct block_hash));
+  if (map->entries == NULL) {
     fprintf(stderr, "Out of mermory\n");
     exit(EXIT_FAILURE);
   }
+
+  map->size = size;
+  map->data = data;
 }
 
-void match_add_hash(unsigned int position, u_int32_t value) {
-  unsigned int bucket = value % num_buckets;
-  block_hash_entries[position].position = position;
-  block_hash_entries[position].next = block_hash_buckets[bucket];
-  block_hash_buckets[bucket] = &block_hash_entries[position];
+void match_add_hash(struct match_table *map, unsigned int position, u_int32_t value) {
+  unsigned int bucket = value % map->num_buckets;
+  map->entries[position].position = position;
+  map->entries[position].next = map->buckets[bucket];
+  map->buckets[bucket] = &map->entries[position];
 }
 
 void _match_free_mismatch_list(struct mismatch *entry) {
@@ -89,15 +85,14 @@ void match_free_list(struct match *entry) {
   }
 }
 
-struct match *match_get_list(u_int32_t value, int checksize, char *old_data, char *new_data) {
-  unsigned int bucket = value % num_buckets;
-  struct match *first = NULL;
+void match_get_list(struct match_table *map, u_int32_t value, int checksize, char *data, struct match** first) {
+  unsigned int bucket = value % map->num_buckets;
 
-  struct block_hash *entry = block_hash_buckets[bucket];
+  struct block_hash *entry = map->buckets[bucket];
   int total_matches = 0;
   while (entry != NULL && total_matches < MAX_MATCHES) {
-    if (value == block_hashes[entry->position]) {
-      if ((entry->position + checksize / BLOCKSIZE) < num_blocks && memcmp(old_data + entry->position * BLOCKSIZE, new_data, checksize) == 0) {
+    if (value == map->hashes[entry->position]) {
+      if ((entry->position + checksize / BLOCKSIZE) < map->num_blocks && memcmp(map->data + entry->position * BLOCKSIZE, data, checksize) == 0) {
         struct match *match = malloc(sizeof(struct match));
         if (match == NULL) {
           fprintf(stderr, "Out of mermory\n");
@@ -111,8 +106,9 @@ struct match *match_get_list(u_int32_t value, int checksize, char *old_data, cha
         match->code_length = SCORE_START;
         match->mismatches_start = NULL;
         match->mismatches_end = NULL;
-        match->next = first;
-        first = match;
+        match->next = *first;
+        match->map = map;
+        *first = match;
 
         total_matches++;
       }
@@ -120,16 +116,14 @@ struct match *match_get_list(u_int32_t value, int checksize, char *old_data, cha
 
     entry = entry->next;
   }
-
-  return first;
 }
 
-void match_grow(struct match *entry, char *old_data, int old_size, char *new_data, int new_size) {
+void match_grow(struct match *entry, char *data, int size) {
   while (entry != NULL) {
     int start_length = entry->length;
-    while (entry->consecutive_mismatches <= MAX_MISMATCHES && entry->position * BLOCKSIZE + entry->length + entry->consecutive_mismatches < old_size && entry->length < (new_size - start_length)) {
+    while (entry->consecutive_mismatches <= MAX_MISMATCHES && entry->position * BLOCKSIZE + entry->length + entry->consecutive_mismatches < entry->map->size && entry->length < (size - start_length)) {
       int old_position = entry->position * BLOCKSIZE + entry->length;
-      if (old_data[old_position + entry->consecutive_mismatches] == new_data[entry->length + entry->consecutive_mismatches]) {
+      if (entry->map->data[old_position + entry->consecutive_mismatches] == data[entry->length + entry->consecutive_mismatches]) {
         if (entry->consecutive_mismatches > 0) {
           struct mismatch *mismatch_list = malloc(sizeof(struct mismatch));
           if (mismatch_list == NULL) {

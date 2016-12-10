@@ -1,7 +1,7 @@
 /*
  * This file is part of MMDelta.
  *
- * Copyright (C) 2015 Iwan Timmer
+ * Copyright (C) 2015, 2016 Iwan Timmer
  *
  * MMDelta is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,18 @@ struct block_hash {
   struct block_hash* next;
 };
 
+struct match_table {
+  int size;
+  char* data;
+
+  u_int32_t *hashes;
+  struct block_hash **buckets;
+  struct block_hash *entries;
+
+  int num_blocks;
+  int num_buckets;
+};
+
 struct mismatch {
   unsigned int position;
   unsigned int length;
@@ -44,6 +56,7 @@ struct match {
   unsigned int code_length;
   unsigned int mismatches;
   unsigned int consecutive_mismatches;
+  struct match_table* map;
   struct mismatch* mismatches_start;
   struct mismatch* mismatches_end;
   struct match* next;
@@ -52,14 +65,14 @@ struct match {
 extern u_int32_t* block_hashes;
 extern int num_blocks;
 
-void match_init_blocks(unsigned int size);
+void match_init_blocks(struct match_table *map, char* data, unsigned int size);
 
-void match_add_hash(unsigned int position, u_int32_t hash);
+void match_add_hash(struct match_table *map, unsigned int position, u_int32_t hash);
 
-struct match* match_get_list(u_int32_t hash, int checksize, char *old_data, char *new_data);
+void match_get_list(struct match_table *map, u_int32_t hash, int checksize, char *data, struct match** first);
 void match_free_list(struct match* entry);
 
-void match_grow(struct match* entry, char* old_data, int old_size, char* new_data, int new_size);
+void match_grow(struct match* entry, char* data, int size);
 struct match* match_get_best(struct match* entry);
 
 #endif /* MATCH_H */

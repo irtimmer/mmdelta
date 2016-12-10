@@ -81,10 +81,11 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
   filters[1].id = LZMA_VLI_UNKNOWN;
   lzma_stream_encoder(&stream->lzma, &filters[0], LZMA_CHECK_NONE);
 
-  match_init_blocks(old_file_size);
-  for (int i = 0; i < num_blocks; i++) {
-    block_hashes[i] = adler32(old_file_data + i * BLOCKSIZE, BLOCKSIZE);
-    match_add_hash(i, block_hashes[i]);
+  struct match_table old_hash_table;
+  match_init_table(&old_hash_table, old_file_data, old_file_size);
+  for (int i = 0; i < old_hash_table.num_blocks; i++) {
+    old_hash_table.hashes[i] = adler32(old_file_data + i * BLOCKSIZE, BLOCKSIZE);
+    match_add_hash(&old_hash_table, i, old_hash_table.hashes[i]);
   }
 
   unsigned int current_pointer = 0;
@@ -102,8 +103,9 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
     else
       hash = adler32(new_file_data + current_pointer, current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer);
 
-    struct match *matches = match_get_list(hash, (current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer), old_file_data, &new_file_data[current_pointer]);
-    match_grow(matches, old_file_data, old_file_size, &new_file_data[current_pointer], new_file_size - current_pointer);
+    struct match *matches = NULL;
+    match_get_list(&old_hash_table, hash, (current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer), &new_file_data[current_pointer], &matches);
+    match_grow(matches, &new_file_data[current_pointer], new_file_size - current_pointer);
 
     struct match *match = match_get_best(matches);
     if (match != NULL) {
@@ -119,13 +121,13 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
       while (mismatches != NULL) {
         buffer_check_flush(stream);
         unsigned int diff;
-        int find = mismatch_find(old_file_data + match->position * BLOCKSIZE + mismatches->position, new_file_data + current_pointer + mismatches->position, mismatches->length, &diff);
+        int find = mismatch_find(match->map->data + match->position * BLOCKSIZE + mismatches->position, new_file_data + current_pointer + mismatches->position, mismatches->length, &diff);
         u_int8_t index = (mismatches->length - 1);
 
         struct mismatch_diff *current_diff;
         switch (find) {
         case -1:
-          current_diff = mismatch_add_enc(&old_file_data[match->position * BLOCKSIZE + mismatches->position], &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
+          current_diff = mismatch_add_enc(match->map->data + match->position * BLOCKSIZE + mismatches->position, &new_file_data[current_pointer + mismatches->position], mismatches->length, current_pointer + mismatches->position);
           buffer_write(&buffer_operations(stream), ENCODE_MISMATCH_OPERATION);
           buffer_write_data(&buffer_data(stream), current_diff->diff_data, mismatches->length);
           break;
