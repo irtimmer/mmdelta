@@ -23,6 +23,9 @@
 #define DIFF_TABLE_SIZE 63
 #define MAX_MISMATCHES 4
 
+#define diff(x, y) (char)(((unsigned int) y - (unsigned int) x) % 256)
+#define patch(x, y) (char)(((unsigned int) x + (unsigned int) y) % 256)
+
 struct mismatch_diff {
   char* old_data;
   char* new_data;

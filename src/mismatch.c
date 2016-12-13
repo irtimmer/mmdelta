@@ -30,7 +30,7 @@ struct mismatch_diff diffs[MAX_MISMATCHES][DIFF_TABLE_SIZE];
 int mismatch_find(char *old_data, char *new_data, unsigned int size, unsigned int *diff) {
   char diff_data[size];
   for (int i = 0; i < size; i++)
-    diff_data[i] = (char)(old_data[i] ^ new_data[i]);
+    diff_data[i] = diff(old_data[i], new_data[i]);
 
   struct mismatch_diff* sdiff = diffs[size - 1];
   bool collision = false;
@@ -81,7 +81,7 @@ struct mismatch_diff *mismatch_add_enc(char *old_data, char *new_data, unsigned 
   struct mismatch_diff *oldest = mismatch_get_oldest(size);
 
   for (int i = 0; i < size; i++)
-    oldest->diff_data[i] = (char)(old_data[i] ^ new_data[i]);
+    oldest->diff_data[i] = diff(old_data[i], new_data[i]);
 
   oldest->last_usage = last_usage;
   oldest->old_data = old_data;
@@ -108,7 +108,7 @@ struct mismatch_diff *mismatch_add_dec(char *old_data, char *diff_data, unsigned
 
   for (int i = 0; i < size; i++) {
     oldest->diff_data[i] = diff_data[i];
-    oldest->new_data[i] = (char)(old_data[i] ^ diff_data[i]);
+    oldest->new_data[i] = patch(old_data[i], diff_data[i]);
   }
 
   return oldest;

@@ -123,7 +123,7 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
           diffs[length-1][index-1].last_usage = written;
           char mismatch_buffer[MAX_MISMATCHES];
           for (int i=0;i<length;i++) {
-            mismatch_buffer[i] = buffer[buffer_offset+i] ^ diffs[length-1][index-1].diff_data[i];
+            mismatch_buffer[i] = patch(buffer[buffer_offset+i], diffs[length-1][index-1].diff_data[i]);
           }
           memcpy(new_file_data + written, mismatch_buffer, length);
         } else {
