@@ -33,16 +33,20 @@
 void decode(const char* old_file, const char* diff_file, const char* target_file) {
   char *old_file_data;
 
-  int old_file_size = mapfile(old_file, (void*) &old_file_data);
+  int old_file_size = mapfile(old_file, 0, (void*) &old_file_data);
   if (old_file_size < 0)
     exit(EXIT_FAILURE);
 
   struct delta_stream* stream = malloc(sizeof(struct delta_stream));
   stream->fd = open(diff_file, O_RDONLY);
   lseek(stream->fd, 7, SEEK_CUR); //Skip MMDELTA
-  lzma_stream_decoder(&stream->lzma, UINT64_MAX, LZMA_TELL_NO_CHECK);
 
-  int fd = open(target_file, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+  int new_file_size;
+  char *new_file_data;
+  if (mapfile(target_file, new_file_size, (void*) &new_file_data) < 0)
+    exit(EXIT_FAILURE);
+
+  lzma_stream_decoder(&stream->lzma, UINT64_MAX, LZMA_TELL_NO_CHECK);
 
   u_int32_t buffer_length = 0, buffer_offset, written = 0;
   u_int32_t last_length = 0;
@@ -54,7 +58,7 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
       case 'A':
       case 'C':
           if (buffer_length > 0) {
-              write(fd, &old_file_data[buffer_offset], buffer_length);
+              memcpy(new_file_data + written, old_file_data + buffer_offset, buffer_length);
               written += buffer_length;
               buffer_length = 0;
           }
@@ -64,7 +68,7 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
       case 'A':
         buffer_read(&buffer_lengths(stream), length);
 
-        write(fd, &(buffer_data(stream).data[buffer_data(stream).offset]), length);
+        memcpy(new_file_data + written, buffer_data(stream).data + buffer_data(stream).offset, length);
         buffer_data(stream).offset += length;
         written += length;
         break;
@@ -81,15 +85,15 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
 
         int position = buffer_read_uleb128(&buffer_offsets(stream)) - last_length;
 
-        write(fd, &old_file_data[buffer_offset], position);
+        memcpy(new_file_data + written, old_file_data + buffer_offset, position);
         buffer_length -= position;
         buffer_offset += position;
         written += position;
 
-        struct mismatch_diff *diff = mismatch_add_dec(&old_file_data[buffer_offset], buffer_data(stream).data + buffer_data(stream).offset, length, written);
+        struct mismatch_diff *diff = mismatch_add_dec(old_file_data + buffer_offset, buffer_data(stream).data + buffer_data(stream).offset, length, written);
         buffer_data(stream).offset += length;
 
-        write(fd, diff->new_data, length);
+        memcpy(new_file_data + written, diff->new_data, length);
         buffer_length -= length;
         buffer_offset += length;
         written += length;
@@ -102,7 +106,7 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
 
         position = buffer_read_uleb128(&buffer_offsets(stream)) - last_length;
 
-        write(fd, &old_file_data[buffer_offset], position);
+        memcpy(new_file_data + written, old_file_data + buffer_offset, position);
         written += position;
         buffer_length -= position;
         buffer_offset += position;
@@ -113,15 +117,15 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
           for (int i=0;i<length;i++) {
             mismatch_buffer[i] = old_file_data[buffer_offset+i] ^ diffs[length-1][index-1].diff_data[i];
           }
-          write(fd, mismatch_buffer, length);
+          memcpy(new_file_data + written, mismatch_buffer, length);
         } else {
-          struct mismatch_diff* diff = mismatch_find_data(&old_file_data[buffer_offset], length);
+          struct mismatch_diff* diff = mismatch_find_data(old_file_data + buffer_offset, length);
           if (diff == NULL) {
             printf("Mismatch diff can't be found\n");
             exit(EXIT_FAILURE);
           }
           diff->last_usage = written;
-          write(fd, diff->new_data, length);
+          memcpy(new_file_data + written, diff->new_data, length);
         }
 
         buffer_length -= length;
@@ -136,6 +140,6 @@ void decode(const char* old_file, const char* diff_file, const char* target_file
     }
   }
   if (buffer_length > 0) {
-      write(fd, &old_file_data[buffer_offset], buffer_length);
+    memcpy(new_file_data + written, old_file_data + buffer_offset, buffer_length);
   }
 }

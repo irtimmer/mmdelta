@@ -1,7 +1,7 @@
 /*
  * This file is part of MMDelta.
  *
- * Copyright (C) 2015 Iwan Timmer
+ * Copyright (C) 2015, 2016 Iwan Timmer
  *
  * MMDelta is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,19 +24,27 @@
 #include <stdio.h>
 #include <unistd.h>
 
-int mapfile(const char *filename, void **filedata) {
+int mapfile(const char *filename, int size, void **filedata) {
   struct stat sb;
-  int fd = open(filename, O_RDONLY);
-  if (fstat(fd, &sb) == -1) {
-    fprintf(stderr, "Can't find file %s\n", filename);
-    return -1;
-  }
-  if (!S_ISREG(sb.st_mode)) {
-    fprintf(stderr, "%s is not a regular file\n", filename);
-    return -1;
+  int fd;
+
+  if (size == 0) {
+    fd = open(filename, O_RDONLY);
+    if (fstat(fd, &sb) == -1) {
+      fprintf(stderr, "Can't find file %s\n", filename);
+      return -1;
+    }
+    if (!S_ISREG(sb.st_mode)) {
+      fprintf(stderr, "%s is not a regular file\n", filename);
+      return -1;
+    }
+    *filedata = mmap(0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+  } else {
+    fd = open(filename, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    ftruncate(fd, size);
+    *filedata = mmap(0, size, PROT_WRITE, MAP_SHARED, fd, 0);
   }
 
-  *filedata = mmap(0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
   if (*filedata == MAP_FAILED) {
     fprintf(stderr, "Can't map %s to memory\n", filename);
     return -1;
@@ -47,5 +55,5 @@ int mapfile(const char *filename, void **filedata) {
     return -1;
   }
 
-  return sb.st_size;
+  return size > 0 ? size : sb.st_size;
 }

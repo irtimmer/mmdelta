@@ -58,11 +58,11 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
   char *old_file_data;
   char *new_file_data;
 
-  int old_file_size = mapfile(old_file, (void*) &old_file_data);
+  int old_file_size = mapfile(old_file, 0, (void*) &old_file_data);
   if (old_file_size < 0)
     exit(EXIT_FAILURE);
 
-  int new_file_size = mapfile(new_file, (void*) &new_file_data);
+  int new_file_size = mapfile(new_file, 0, (void*) &new_file_data);
   if (new_file_size < 0)
     exit(EXIT_FAILURE);
 
