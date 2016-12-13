@@ -69,6 +69,7 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
   struct delta_stream* stream = malloc(sizeof(struct delta_stream));
   stream->fd = open(diff_file, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   write(stream->fd, "MMDELTA", 7);
+  write(stream->fd, &new_file_size, sizeof(int));
 
   lzma_filter filters[2] = {0};
   static lzma_options_lzma options;
@@ -88,6 +89,10 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
     match_add_hash(&old_hash_table, i, old_hash_table.hashes[i]);
   }
 
+  struct match_table new_hash_table;
+  match_init_table(&new_hash_table, new_file_data, new_file_size);
+  new_hash_table.size = 0;
+
   unsigned int current_pointer = 0;
   unsigned int current_add = 0;
   u_int32_t hash;
@@ -104,7 +109,9 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
       hash = adler32(new_file_data + current_pointer, current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer);
 
     struct match *matches = NULL;
-    match_get_list(&old_hash_table, hash, (current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer), &new_file_data[current_pointer], &matches);
+    int remaining = (current_pointer + BLOCKSIZE < new_file_size ? BLOCKSIZE : new_file_size - current_pointer);
+    match_get_list(&old_hash_table, hash, remaining, &new_file_data[current_pointer], &matches);
+    match_get_list(&new_hash_table, hash, remaining, &new_file_data[current_pointer], &matches);
     match_grow(matches, &new_file_data[current_pointer], new_file_size - current_pointer);
 
     struct match *match = match_get_best(matches);
@@ -114,7 +121,8 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
       buffer_check_flush(stream);
       buffer_write(&buffer_operations(stream), COPY_OPERATION);
       buffer_write(&buffer_lengths(stream), match->length);
-      buffer_write(&buffer_addresses(stream), match->position);
+      int position = match->position + (match->map == &old_hash_table ? 0 : old_hash_table.num_blocks);
+      buffer_write(&buffer_addresses(stream), position);
 
       struct mismatch *mismatches = match->mismatches_start;
       int mismatch_last_position = 0;
@@ -146,10 +154,20 @@ void encode(const char* old_file, const char* new_file, const char* diff_file) {
         mismatches = mismatches->next;
       }
 
+      for (int i = current_pointer / BLOCKSIZE; i < (current_pointer + match->length) / BLOCKSIZE; i++) {
+        new_hash_table.hashes[i] = adler32(new_file_data + i * BLOCKSIZE, BLOCKSIZE);
+        match_add_hash(&new_hash_table, i, new_hash_table.hashes[i]);
+      }
       current_pointer += match->length;
     } else {
       current_pointer++;
       current_add++;
+
+      if (current_pointer % BLOCKSIZE == 0) {
+        int index = (current_pointer / BLOCKSIZE) - 1;
+        new_hash_table.hashes[index] = adler32(new_file_data + index * BLOCKSIZE, BLOCKSIZE);
+        match_add_hash(&new_hash_table, index, new_hash_table.hashes[index]);
+      }
     }
     match_free_list(matches);
   }
